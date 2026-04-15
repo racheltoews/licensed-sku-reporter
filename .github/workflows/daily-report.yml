@@ -1,0 +1,28 @@
+name: Licensed SKU Daily Report
+
+on:
+  schedule:
+    # 8 AM CT weekdays = 1 PM UTC (CDT, Apr-Nov)
+    # In winter (CST, Nov-Mar) this will fire at 7 AM CT instead — adjust if needed
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch:  # allows manual trigger from GitHub UI
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run licensed SKU report
+        env:
+          PLYTIX_API_KEY: ${{ secrets.PLYTIX_API_KEY }}
+          PLYTIX_API_PASSWORD: ${{ secrets.PLYTIX_API_PASSWORD }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: python licensed_sku_report.py
