@@ -198,8 +198,30 @@ def get_lookback_window():
 
 # ──────────────────────────── SLACK ────────────────────────────
 
+def open_slack_dm(user_id):
+    """Open (or retrieve) a DM channel with a user."""
+    resp = requests.post(
+        "https://slack.com/api/conversations.open",
+        headers={
+            "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
+            "Content-Type": "application/json",
+        },
+        json={"users": user_id},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if not data.get("ok"):
+        raise RuntimeError(f"Slack conversations.open error: {data.get('error', 'unknown')}")
+    channel_id = data["channel"]["id"]
+    print(f"DM channel opened: {channel_id}")
+    return channel_id
+
+
 def send_slack_dm(message):
     """Send a Slack DM to Lauren Patterson."""
+    # First open/get the DM channel, then post to it
+    dm_channel = open_slack_dm(SLACK_LAUREN_USER_ID)
+
     resp = requests.post(
         "https://slack.com/api/chat.postMessage",
         headers={
@@ -207,7 +229,7 @@ def send_slack_dm(message):
             "Content-Type": "application/json",
         },
         json={
-            "channel": SLACK_LAUREN_USER_ID,
+            "channel": dm_channel,
             "text": message,
         },
     )
