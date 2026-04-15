@@ -25,7 +25,7 @@ PLYTIX_AUTH_URL = "https://auth.plytix.com/auth/api/get-token"
 PLYTIX_BASE_URL = "https://pim.plytix.com"
 
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
-SLACK_LAUREN_USER_ID = "U05AL9QQHT8"
+SLACK_CHANNEL_ID = "C021JEZGNQ6"  # #manufacturing-licensing
 
 # Central Time
 CT = timezone(timedelta(hours=-5))   # CDT (Mar–Nov)
@@ -198,30 +198,8 @@ def get_lookback_window():
 
 # ──────────────────────────── SLACK ────────────────────────────
 
-def open_slack_dm(user_id):
-    """Open (or retrieve) a DM channel with a user."""
-    resp = requests.post(
-        "https://slack.com/api/conversations.open",
-        headers={
-            "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
-            "Content-Type": "application/json",
-        },
-        json={"users": user_id},
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    if not data.get("ok"):
-        raise RuntimeError(f"Slack conversations.open error: {data.get('error', 'unknown')}")
-    channel_id = data["channel"]["id"]
-    print(f"DM channel opened: {channel_id}")
-    return channel_id
-
-
-def send_slack_dm(message):
-    """Send a Slack DM to Lauren Patterson."""
-    # First open/get the DM channel, then post to it
-    dm_channel = open_slack_dm(SLACK_LAUREN_USER_ID)
-
+def send_slack_message(message):
+    """Post to #manufacturing-licensing channel."""
     resp = requests.post(
         "https://slack.com/api/chat.postMessage",
         headers={
@@ -229,7 +207,7 @@ def send_slack_dm(message):
             "Content-Type": "application/json",
         },
         json={
-            "channel": dm_channel,
+            "channel": SLACK_CHANNEL_ID,
             "text": message,
         },
     )
@@ -353,7 +331,7 @@ def main():
     # 6. Format and send
     message = format_message(display_date, confirmed, possibly_licensed)
     print(f"\n--- Message preview ---\n{message}\n--- End preview ---\n")
-    send_slack_dm(message)
+    send_slack_message(message)
     print("Done!")
 
 
