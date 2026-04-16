@@ -157,10 +157,12 @@ def check_ornamentation_licensed(token, ornamentation, confirmed_ornamentations)
         attributes=["sku", "attributes.licensor", "attributes.licensing_organization"],
         page=1,
     )
-    if products:
-        match = products[0]
-        licensor = match.get("attributes", {}).get("licensor", "unknown")
-        return f"Ornamentation match: {ornamentation} (existing SKU {match.get('sku')} has licensor: {licensor})"
+    for match in products:
+        licensor = match.get("attributes", {}).get("licensor") or ""
+        licensor = licensor.strip()
+        # Only count as licensed if licensor has a real value (not blank)
+        if licensor and licensor.upper() != "UNKNOWN":
+            return f"Ornamentation match: {ornamentation} (existing SKU {match.get('sku')} has licensor: {licensor})"
 
     return None
 
