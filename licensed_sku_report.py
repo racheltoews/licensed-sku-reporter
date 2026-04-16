@@ -33,12 +33,27 @@ CT = timezone(timedelta(hours=-5))   # CDT (Mar–Nov)
 # date math. CDT is UTC-5, CST is UTC-6. April–November is CDT.
 # If this ever matters in winter, swap to -6 or use pytz/zoneinfo.
 
-# Licensed label patterns
+# Licensed label patterns (Method A)
 LICENSED_PREFIXES = [
     "Disney-", "Marvel-", "Sesame Street-", "Hasbro-",
     "NHL-", "Collegiate-", "Farm Build-Collegiate-",
 ]
 LICENSED_CONTAINS = ["NFL"]
+
+# Licensed ornamentation keywords — case-insensitive substring match (Method C)
+LICENSED_ORNAMENTATION_KEYWORDS = [
+    # Disney
+    "Mickey", "Minnie", "Donald", "Goofy", "Pluto", "Stitch", "Moana",
+    "Elsa", "Frozen", "Pixar", "Disney",
+    # Marvel
+    "Marvel", "Spider-Man", "Spiderman", "Iron Man", "Captain America", "Avengers",
+    # Sesame Street
+    "Elmo", "Cookie Monster", "Big Bird", "Sesame",
+    # Hasbro
+    "Hasbro", "My Little Pony", "Transformers",
+    # Sports leagues
+    "NFL", "NHL", "NBA", "MLB",
+]
 
 PAGE_SIZE = 100
 
@@ -132,6 +147,17 @@ def check_label_licensed(label):
     for term in LICENSED_CONTAINS:
         if term in label:
             return f"Label contains: {term}"
+    return None
+
+
+def check_ornamentation_keywords(ornamentation):
+    """Method C: Check ornamentation name against known licensed keywords."""
+    if not ornamentation:
+        return None
+    orn_lower = ornamentation.lower()
+    for keyword in LICENSED_ORNAMENTATION_KEYWORDS:
+        if keyword.lower() in orn_lower:
+            return f"Ornamentation keyword: '{keyword}' in '{ornamentation}'"
     return None
 
 
@@ -321,7 +347,11 @@ def main():
         # Method A: label match
         reason = check_label_licensed(label)
 
-        # Method B: ornamentation match
+        # Method C: ornamentation keyword match
+        if not reason:
+            reason = check_ornamentation_keywords(orn)
+
+        # Method B: ornamentation match against existing licensed products
         if not reason:
             reason = check_ornamentation_licensed(token, orn, confirmed_ornamentations)
 
