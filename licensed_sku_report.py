@@ -173,13 +173,15 @@ def check_ornamentation_licensed(token, ornamentation, confirmed_ornamentations)
     if ornamentation in confirmed_ornamentations:
         return f"Ornamentation match: {ornamentation} (known licensed)"
 
-    # Query Plytix for any existing product with this ornamentation + licensor
+    # Query Plytix for any existing product with this ornamentation + licensor.
+    # Both conditions go in the same inner list so they AND together — separate
+    # inner lists are OR'd, which previously matched every licensed product.
     products, _ = search_products(
         token,
-        filters=[
-            [{"field": "attributes.ornamentation_family", "operator": "eq", "value": ornamentation}],
-            [{"field": "attributes.licensor", "operator": "exists"}],
-        ],
+        filters=[[
+            {"field": "attributes.ornamentation_family", "operator": "eq", "value": ornamentation},
+            {"field": "attributes.licensor", "operator": "exists"},
+        ]],
         attributes=["sku", "attributes.licensor", "attributes.licensing_organization"],
         page=1,
     )
