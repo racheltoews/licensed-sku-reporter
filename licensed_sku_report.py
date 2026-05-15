@@ -13,6 +13,7 @@ Lookback logic:
 import json
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -88,14 +89,23 @@ def search_products(token, filters, attributes, page=1):
         "sort": [{"field": "created", "order": "desc"}],
         "pagination": {"page": page, "page_size": PAGE_SIZE},
     }
-    resp = requests.post(
-        f"{PLYTIX_BASE_URL}/api/v2/products/search",
-        headers=plytix_headers(token),
-        json=body,
-    )
+    url = f"{PLYTIX_BASE_URL}/api/v2/products/search"
+    for attempt in range(5):
+        resp = requests.post(url, headers=plytix_headers(token), json=body)
+        if resp.status_code == 429:
+            retry_after = resp.headers.get("Retry-After")
+            try:
+                wait = float(retry_after) if retry_after else 2 ** attempt
+            except ValueError:
+                wait = 2 ** attempt
+            wait = min(wait, 30)
+            print(f"  Plytix 429 rate-limited; sleeping {wait}s (attempt {attempt + 1}/5)")
+            time.sleep(wait)
+            continue
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("products", data.get("data", [])), data.get("pagination", {})
     resp.raise_for_status()
-    data = resp.json()
-    return data.get("products", data.get("data", [])), data.get("pagination", {})
 
 
 def collect_products_in_window(token, filters, attributes, utc_start, utc_end):
@@ -161,10 +171,13 @@ def check_ornamentation_keywords(ornamentation):
     return None
 
 
+_orn_lookup_cache = {}
+
+
 def check_ornamentation_licensed(token, ornamentation, confirmed_ornamentations):
     """
     Method B: Check if ornamentation matches a known licensed product.
-    First check against the confirmed list, then query Plytix.
+    First check against the confirmed list, then query Plytix (cached per run).
     """
     if not ornamentation:
         return None
@@ -172,6 +185,9 @@ def check_ornamentation_licensed(token, ornamentation, confirmed_ornamentations)
     # Check against confirmed licensed ornamentations from this run
     if ornamentation in confirmed_ornamentations:
         return f"Ornamentation match: {ornamentation} (known licensed)"
+
+    if ornamentation in _orn_lookup_cache:
+        return _orn_lookup_cache[ornamentation]
 
     # Query Plytix for any existing product with this ornamentation + licensor.
     # Both conditions go in the same inner list so they AND together — separate
@@ -185,14 +201,17 @@ def check_ornamentation_licensed(token, ornamentation, confirmed_ornamentations)
         attributes=["sku", "attributes.licensor", "attributes.licensing_organization"],
         page=1,
     )
+    result = None
     for match in products:
         licensor = match.get("attributes", {}).get("licensor") or ""
         licensor = licensor.strip()
         # Only count as licensed if licensor has a real value (not blank)
         if licensor and licensor.upper() != "UNKNOWN":
-            return f"Ornamentation match: {ornamentation} (existing SKU {match.get('sku')} has licensor: {licensor})"
+            result = f"Ornamentation match: {ornamentation} (existing SKU {match.get('sku')} has licensor: {licensor})"
+            break
 
-    return None
+    _orn_lookup_cache[ornamentation] = result
+    return result
 
 
 # ──────────────────────────── DATE WINDOW ────────────────────────────
